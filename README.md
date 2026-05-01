@@ -35,6 +35,52 @@
 
 ---
 
+## 🚀 安装（AI Agent Skill）
+
+帝王术不仅是文档，更是一个**可安装的 AI Agent Skill**。安装后，你的 AI 会自动以帝王术约束自己的行为。
+
+### 一行安装（推荐）
+
+```bash
+git clone https://github.com/SoujiOkita98/imperium.git ~/.claude/skills/imperium
+```
+
+### 多 Agent 支持
+
+支持 Claude Code、Codex、Cursor、OpenClaw 等主流 AI Agent：
+
+```bash
+# 克隆 repo
+git clone https://github.com/SoujiOkita98/imperium.git
+cd imperium
+
+# 自动检测已安装的 agent 并注册
+./setup
+
+# 或指定特定 agent
+./setup --host=claude
+./setup --host=codex
+./setup --host=cursor
+./setup --host=openclaw
+
+# 卸载
+./setup --uninstall
+```
+
+安装后，打开你的 AI Agent 对话，说以下任意一词即可激活：
+
+| 触发词 | 效果 |
+|:-------|:-----|
+| `帝王术` / `imperium` / `/imperium` | 列出所有可用策略 |
+| `L1` / `法家模式` | AI 进入零自主模式，严格 checklist |
+| `L2` / `儒家模式` | AI 进入有限授权模式，画框执行 |
+| `L3` / `权谋模式` | AI 进入全权负责模式，直谏+超预期 |
+| `先立敌论` / `站在反方` | AI 先列出推翻你方案的 3 个理由 |
+| `证据分账` / `分层结论` | AI 把结论拆成事实/推断/假设 |
+| `败局预演` / `算败` | AI 预演 5 条失败路径和停机条件 |
+
+---
+
 ## ⚔️ 核心原则
 
 1. **古今不二** — 左手《韩非子》，右手《君主论》

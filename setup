@@ -1,0 +1,128 @@
+#!/usr/bin/env bash
+# Imperium · 帝王术 Setup
+# 一键安装到 Claude Code / Codex / Cursor / OpenClaw 等 AI Agent 的 skills 目录
+#
+# Usage:
+#   ./setup                    # 自动检测已安装的 agent
+#   ./setup --host=claude      # 只装到 Claude Code
+#   ./setup --host=codex       # 只装到 Codex
+#   ./setup --host=cursor      # 只装到 Cursor
+#   ./setup --host=auto        # 自动检测（默认）
+#   ./setup --uninstall        # 卸载
+
+set -e
+
+REPO_ROOT="$(cd "$(dirname "$0")" && pwd)"
+SKILL_NAME="imperium"
+QUIET=0
+UNINSTALL=0
+
+# ─── Parse flags ──────────────────────────────────────────────
+HOST="auto"
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --host) HOST="$2"; shift 2 ;;
+    --host=*) HOST="${1#--host=}"; shift ;;
+    --uninstall) UNINSTALL=1; shift ;;
+    -q|--quiet) QUIET=1; shift ;;
+    *) echo "Unknown option: $1" >&2; exit 1 ;;
+  esac
+done
+
+log() { [ "$QUIET" -eq 0 ] && echo "$@" || true; }
+
+# ─── Detect installed agents ──────────────────────────────────
+DETECT_CLAUDE=0
+DETECT_CODEX=0
+DETECT_CURSOR=0
+DETECT_OPENCLAW=0
+
+command -v claude >/dev/null 2>&1 && DETECT_CLAUDE=1
+command -v codex >/dev/null 2>&1 && DETECT_CODEX=1
+[ -d "$HOME/.cursor" ] && DETECT_CURSOR=1
+[ -d "$HOME/.openclaw" ] && DETECT_OPENCLAW=1
+
+# ─── Resolve targets ──────────────────────────────────────────
+INSTALL_CLAUDE=0
+INSTALL_CODEX=0
+INSTALL_CURSOR=0
+INSTALL_OPENCLAW=0
+
+if [ "$HOST" = "auto" ]; then
+  INSTALL_CLAUDE=$DETECT_CLAUDE
+  INSTALL_CODEX=$DETECT_CODEX
+  INSTALL_CURSOR=$DETECT_CURSOR
+  INSTALL_OPENCLAW=$DETECT_OPENCLAW
+  # 默认至少装 Claude Code
+  if [ "$INSTALL_CLAUDE" -eq 0 ] && [ "$INSTALL_CODEX" -eq 0 ] && [ "$INSTALL_CURSOR" -eq 0 ] && [ "$INSTALL_OPENCLAW" -eq 0 ]; then
+    INSTALL_CLAUDE=1
+    log "未检测到任何 agent，默认安装到 Claude Code。"
+  fi
+else
+  case "$HOST" in
+    claude) INSTALL_CLAUDE=1 ;;
+    codex)  INSTALL_CODEX=1 ;;
+    cursor) INSTALL_CURSOR=1 ;;
+    openclaw) INSTALL_OPENCLAW=1 ;;
+    *) echo "Unknown --host: $HOST (expected: claude, codex, cursor, openclaw, auto)" >&2; exit 1 ;;
+  esac
+fi
+
+# ─── Uninstall ────────────────────────────────────────────────
+if [ "$UNINSTALL" -eq 1 ]; then
+  log "卸载帝王术 skill..."
+  [ -L "$HOME/.claude/skills/$SKILL_NAME" ] && rm "$HOME/.claude/skills/$SKILL_NAME" && log "  ✓ 已从 Claude Code 卸载"
+  [ -L "$HOME/.codex/skills/$SKILL_NAME" ] && rm "$HOME/.codex/skills/$SKILL_NAME" && log "  ✓ 已从 Codex 卸载"
+  [ -L "$HOME/.cursor/skills/$SKILL_NAME" ] && rm "$HOME/.cursor/skills/$SKILL_NAME" && log "  ✓ 已从 Cursor 卸载"
+  [ -L "$HOME/.openclaw/skills/$SKILL_NAME" ] && rm "$HOME/.openclaw/skills/$SKILL_NAME" && log "  ✓ 已从 OpenClaw 卸载"
+  log "卸载完成。"
+  exit 0
+fi
+
+# ─── Install helper ───────────────────────────────────────────
+install_to() {
+  local skills_dir="$1"
+  local agent_name="$2"
+  local target="$skills_dir/$SKILL_NAME"
+
+  mkdir -p "$skills_dir"
+
+  if [ -L "$target" ]; then
+    rm "$target"
+  elif [ -d "$target" ]; then
+    echo "  ⚠️  $agent_name: $target 已是真实目录，跳过（请手动删除后重试）" >&2
+    return 1
+  fi
+
+  ln -s "$REPO_ROOT" "$target"
+  log "  ✓ 已注册到 $agent_name: $target → $REPO_ROOT"
+}
+
+# ─── Execute installs ─────────────────────────────────────────
+log ""
+log "🔱 安装帝王术 · Imperium"
+log ""
+
+if [ "$INSTALL_CLAUDE" -eq 1 ]; then
+  install_to "$HOME/.claude/skills" "Claude Code"
+fi
+
+if [ "$INSTALL_CODEX" -eq 1 ]; then
+  install_to "$HOME/.codex/skills" "Codex"
+fi
+
+if [ "$INSTALL_CURSOR" -eq 1 ]; then
+  install_to "$HOME/.cursor/skills" "Cursor"
+fi
+
+if [ "$INSTALL_OPENCLAW" -eq 1 ]; then
+  install_to "$HOME/.openclaw/skills" "OpenClaw"
+fi
+
+log ""
+log "✅ 安装完成。"
+log ""
+log "触发方式："
+log "  说 '帝王术'、'imperium'、'先立敌论'、'L3授权' 等即可激活"
+log ""
+log "卸载：./setup --uninstall"
