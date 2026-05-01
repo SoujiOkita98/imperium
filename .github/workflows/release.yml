@@ -1,0 +1,36 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Package .skill file
+        run: |
+          # Create a temp directory with the skill structure
+          mkdir -p _pkg/${{ github.event.repository.name }}
+          cp -r SKILL.md setup references/ .agents/ _pkg/${{ github.event.repository.name }}/ 2>/dev/null || true
+          cp SKILL.md setup README.md CHANGELOG.md 帝训.md 模板.md 01-授权自主.md 02-反证校验.md banner.png _pkg/${{ github.event.repository.name }}/ 2>/dev/null || true
+          # Package as .skill (zip with .skill extension)
+          cd _pkg
+          zip -r ../imperium.skill ${{ github.event.repository.name }}
+          cd ..
+          ls -la imperium.skill
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: imperium.skill
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -1,13 +1,16 @@
 #!/usr/bin/env bash
 # Imperium · 帝王术 Setup
-# 一键安装到 Claude Code / Codex / Cursor / OpenClaw 等 AI Agent 的 skills 目录
+# 一键安装到 Claude Code / Kimi / Codex / Cursor / OpenClaw 等 AI Agent
 #
 # Usage:
-#   ./setup                    # 自动检测已安装的 agent
+#   ./setup                    # 自动检测并安装
 #   ./setup --host=claude      # 只装到 Claude Code
+#   ./setup --host=kimi        # 只装到 Kimi
 #   ./setup --host=codex       # 只装到 Codex
 #   ./setup --host=cursor      # 只装到 Cursor
-#   ./setup --host=auto        # 自动检测（默认）
+#   ./setup --host=openclaw    # 只装到 OpenClaw
+#   ./setup --upgrade          # 升级（git pull）
+#   ./setup --version          # 显示版本
 #   ./setup --uninstall        # 卸载
 
 set -e
@@ -16,6 +19,8 @@ REPO_ROOT="$(cd "$(dirname "$0")" && pwd)"
 SKILL_NAME="imperium"
 QUIET=0
 UNINSTALL=0
+UPGRADE=0
+SHOW_VERSION=0
 
 # ─── Parse flags ──────────────────────────────────────────────
 HOST="auto"
@@ -24,57 +29,128 @@ while [ $# -gt 0 ]; do
     --host) HOST="$2"; shift 2 ;;
     --host=*) HOST="${1#--host=}"; shift ;;
     --uninstall) UNINSTALL=1; shift ;;
+    --upgrade) UPGRADE=1; shift ;;
+    --version) SHOW_VERSION=1; shift ;;
     -q|--quiet) QUIET=1; shift ;;
-    *) echo "Unknown option: $1" >&2; exit 1 ;;
+    -h|--help)
+      echo "Usage: ./setup [options]"
+      echo ""
+      echo "Options:"
+      echo "  --host=NAME    Install to specific agent (claude, kimi, codex, cursor, openclaw, auto)"
+      echo "  --upgrade      Upgrade to latest version (git pull)"
+      echo "  --version      Show current version"
+      echo "  --uninstall    Remove skill from all agents"
+      echo "  -q, --quiet    Suppress output"
+      echo "  -h, --help     Show this help"
+      exit 0
+      ;;
+    *) echo "Unknown option: $1 (use --help)" >&2; exit 1 ;;
   esac
 done
 
 log() { [ "$QUIET" -eq 0 ] && echo "$@" || true; }
 
+# ─── Version ──────────────────────────────────────────────────
+VERSION="1.0.0"
+if [ -f "$REPO_ROOT/.git/HEAD" ]; then
+  GIT_SHA="$(git -C "$REPO_ROOT" rev-parse --short HEAD 2>/dev/null || echo "unknown")"
+  VERSION="${VERSION}+${GIT_SHA}"
+fi
+
+if [ "$SHOW_VERSION" -eq 1 ]; then
+  echo "Imperium · 帝王术 v${VERSION}"
+  exit 0
+fi
+
+# ─── Skill paths by priority ──────────────────────────────────
+# Official priority: agents > kimi > claude
+AGENTS_SKILLS="${AGENTS_SKILLS:-$HOME/.config/agents/skills}"
+KIMI_SKILLS="${KIMI_SKILLS:-$HOME/.kimi/skills}"
+CLAUDE_SKILLS="${CLAUDE_SKILLS:-$HOME/.claude/skills}"
+CODEX_SKILLS="${CODEX_SKILLS:-$HOME/.codex/skills}"
+CURSOR_SKILLS="${CURSOR_SKILLS:-$HOME/.cursor/skills}"
+OPENCLAW_SKILLS="${OPENCLAW_SKILLS:-$HOME/.openclaw/skills}"
+
+# ─── Upgrade ──────────────────────────────────────────────────
+if [ "$UPGRADE" -eq 1 ]; then
+  if [ ! -d "$REPO_ROOT/.git" ]; then
+    echo "Error: Not a git repo. Cannot upgrade." >&2
+    echo "Re-install with: git clone https://github.com/SoujiOkita98/imperium.git" >&2
+    exit 1
+  fi
+
+  log "🔱 升级帝王术..."
+  cd "$REPO_ROOT"
+
+  # Check if there are local changes
+  if [ -n "$(git status --porcelain 2>/dev/null)" ]; then
+    echo "Warning: You have local changes. Stashing them..." >&2
+    git stash
+  fi
+
+  git pull origin main
+  log "✅ 升级完成。"
+  log ""
+  log "当前版本: $(git rev-parse --short HEAD)"
+  log ""
+  log "如果 AI Agent 正在运行，重启对话以加载最新 skill。"
+  exit 0
+fi
+
 # ─── Detect installed agents ──────────────────────────────────
 DETECT_CLAUDE=0
+DETECT_KIMI=0
 DETECT_CODEX=0
 DETECT_CURSOR=0
 DETECT_OPENCLAW=0
 
 command -v claude >/dev/null 2>&1 && DETECT_CLAUDE=1
+command -v kimi >/dev/null 2>&1 && DETECT_KIMI=1
 command -v codex >/dev/null 2>&1 && DETECT_CODEX=1
 [ -d "$HOME/.cursor" ] && DETECT_CURSOR=1
 [ -d "$HOME/.openclaw" ] && DETECT_OPENCLAW=1
 
 # ─── Resolve targets ──────────────────────────────────────────
 INSTALL_CLAUDE=0
+INSTALL_KIMI=0
 INSTALL_CODEX=0
 INSTALL_CURSOR=0
 INSTALL_OPENCLAW=0
 
 if [ "$HOST" = "auto" ]; then
   INSTALL_CLAUDE=$DETECT_CLAUDE
+  INSTALL_KIMI=$DETECT_KIMI
   INSTALL_CODEX=$DETECT_CODEX
   INSTALL_CURSOR=$DETECT_CURSOR
   INSTALL_OPENCLAW=$DETECT_OPENCLAW
-  # 默认至少装 Claude Code
-  if [ "$INSTALL_CLAUDE" -eq 0 ] && [ "$INSTALL_CODEX" -eq 0 ] && [ "$INSTALL_CURSOR" -eq 0 ] && [ "$INSTALL_OPENCLAW" -eq 0 ]; then
+  # Default to claude if none detected
+  if [ "$INSTALL_CLAUDE" -eq 0 ] && [ "$INSTALL_KIMI" -eq 0 ] && [ "$INSTALL_CODEX" -eq 0 ] && [ "$INSTALL_CURSOR" -eq 0 ] && [ "$INSTALL_OPENCLAW" -eq 0 ]; then
     INSTALL_CLAUDE=1
     log "未检测到任何 agent，默认安装到 Claude Code。"
   fi
 else
   case "$HOST" in
-    claude) INSTALL_CLAUDE=1 ;;
-    codex)  INSTALL_CODEX=1 ;;
-    cursor) INSTALL_CURSOR=1 ;;
+    claude)   INSTALL_CLAUDE=1 ;;
+    kimi)     INSTALL_KIMI=1 ;;
+    codex)    INSTALL_CODEX=1 ;;
+    cursor)   INSTALL_CURSOR=1 ;;
     openclaw) INSTALL_OPENCLAW=1 ;;
-    *) echo "Unknown --host: $HOST (expected: claude, codex, cursor, openclaw, auto)" >&2; exit 1 ;;
+    *) echo "Unknown --host: $HOST (expected: claude, kimi, codex, cursor, openclaw, auto)" >&2; exit 1 ;;
   esac
 fi
 
 # ─── Uninstall ────────────────────────────────────────────────
 if [ "$UNINSTALL" -eq 1 ]; then
-  log "卸载帝王术 skill..."
-  [ -L "$HOME/.claude/skills/$SKILL_NAME" ] && rm "$HOME/.claude/skills/$SKILL_NAME" && log "  ✓ 已从 Claude Code 卸载"
-  [ -L "$HOME/.codex/skills/$SKILL_NAME" ] && rm "$HOME/.codex/skills/$SKILL_NAME" && log "  ✓ 已从 Codex 卸载"
-  [ -L "$HOME/.cursor/skills/$SKILL_NAME" ] && rm "$HOME/.cursor/skills/$SKILL_NAME" && log "  ✓ 已从 Cursor 卸载"
-  [ -L "$HOME/.openclaw/skills/$SKILL_NAME" ] && rm "$HOME/.openclaw/skills/$SKILL_NAME" && log "  ✓ 已从 OpenClaw 卸载"
+  log "🔱 卸载帝王术..."
+  for dir in "$AGENTS_SKILLS" "$KIMI_SKILLS" "$CLAUDE_SKILLS" "$CODEX_SKILLS" "$CURSOR_SKILLS" "$OPENCLAW_SKILLS"; do
+    target="$dir/$SKILL_NAME"
+    if [ -L "$target" ]; then
+      rm "$target" && log "  ✓ 已移除: $target"
+    elif [ -d "$target" ]; then
+      log "  ⚠️  $target 是真实目录，跳过（请手动删除）"
+    fi
+  done
+  log ""
   log "卸载完成。"
   exit 0
 fi
@@ -88,6 +164,12 @@ install_to() {
   mkdir -p "$skills_dir"
 
   if [ -L "$target" ]; then
+    # Check if it points to the right place
+    current_link="$(readlink "$target" 2>/dev/null || true)"
+    if [ "$current_link" = "$REPO_ROOT" ]; then
+      log "  ✓ $agent_name: 已是最新版本 ($target)"
+      return 0
+    fi
     rm "$target"
   elif [ -d "$target" ]; then
     echo "  ⚠️  $agent_name: $target 已是真实目录，跳过（请手动删除后重试）" >&2
@@ -95,28 +177,34 @@ install_to() {
   fi
 
   ln -s "$REPO_ROOT" "$target"
-  log "  ✓ 已注册到 $agent_name: $target → $REPO_ROOT"
+  log "  ✓ 已注册到 $agent_name: $target"
 }
 
 # ─── Execute installs ─────────────────────────────────────────
 log ""
-log "🔱 安装帝王术 · Imperium"
+log "🔱 安装帝王术 · Imperium v${VERSION}"
 log ""
 
 if [ "$INSTALL_CLAUDE" -eq 1 ]; then
-  install_to "$HOME/.claude/skills" "Claude Code"
+  install_to "$CLAUDE_SKILLS" "Claude Code"
+  # Also install to agents/ as fallback for newer versions
+  install_to "$AGENTS_SKILLS" "Agents (通用)"
+fi
+
+if [ "$INSTALL_KIMI" -eq 1 ]; then
+  install_to "$KIMI_SKILLS" "Kimi"
 fi
 
 if [ "$INSTALL_CODEX" -eq 1 ]; then
-  install_to "$HOME/.codex/skills" "Codex"
+  install_to "$CODEX_SKILLS" "Codex"
 fi
 
 if [ "$INSTALL_CURSOR" -eq 1 ]; then
-  install_to "$HOME/.cursor/skills" "Cursor"
+  install_to "$CURSOR_SKILLS" "Cursor"
 fi
 
 if [ "$INSTALL_OPENCLAW" -eq 1 ]; then
-  install_to "$HOME/.openclaw/skills" "OpenClaw"
+  install_to "$OPENCLAW_SKILLS" "OpenClaw"
 fi
 
 log ""
@@ -125,4 +213,5 @@ log ""
 log "触发方式："
 log "  说 '帝王术'、'imperium'、'先立敌论'、'L3授权' 等即可激活"
 log ""
+log "升级：./setup --upgrade"
 log "卸载：./setup --uninstall"
