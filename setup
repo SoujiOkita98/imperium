@@ -16,6 +16,7 @@
 set -e
 
 REPO_ROOT="$(cd "$(dirname "$0")" && pwd)"
+SKILL_DIR="$REPO_ROOT/skill"
 SKILL_NAME="imperium"
 QUIET=0
 UNINSTALL=0
@@ -176,7 +177,7 @@ install_to() {
     return 1
   fi
 
-  ln -s "$REPO_ROOT" "$target"
+  ln -s "$SKILL_DIR" "$target"
   log "  ✓ 已注册到 $agent_name: $target"
 }
 

@@ -15,17 +15,22 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Validate skill structure
+        run: |
+          if [ ! -f "skill/SKILL.md" ]; then
+            echo "Error: skill/SKILL.md not found" >&2
+            exit 1
+          fi
+          echo "✓ Skill structure valid"
+
       - name: Package .skill file
         run: |
-          # Create a temp directory with the skill structure
-          mkdir -p _pkg/${{ github.event.repository.name }}
-          cp -r SKILL.md setup references/ .agents/ _pkg/${{ github.event.repository.name }}/ 2>/dev/null || true
-          cp SKILL.md setup README.md CHANGELOG.md 帝训.md 模板.md 01-授权自主.md 02-反证校验.md banner.png _pkg/${{ github.event.repository.name }}/ 2>/dev/null || true
-          # Package as .skill (zip with .skill extension)
-          cd _pkg
-          zip -r ../imperium.skill ${{ github.event.repository.name }}
+          # Package only the skill/ directory as .skill (zip)
+          cd skill
+          zip -r ../imperium.skill .
           cd ..
           ls -la imperium.skill
+          unzip -l imperium.skill
 
       - name: Create Release
         uses: softprops/action-gh-release@v1
